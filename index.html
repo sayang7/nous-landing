@@ -1,0 +1,2344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NOUS — Formal Reasoning Integrity Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Share+Tech+Mono&family=Cinzel:wght@400;600;700&display=swap" rel="stylesheet">
+
+<style>
+/* ============================================================
+   DESIGN TOKENS
+   ============================================================ */
+:root {
+  --canvas:            #04030a;
+  --surface:           #0d0b1a;
+  --raised:            #16132a;
+  --border:            #2a2450;
+  --border-glow:       rgba(181,123,238,0.25);
+
+  --accent-primary:    #b57bee;
+  --accent-secondary:  #7ef4e8;
+  --accent-tertiary:   #f472b6;
+  --accent-gold:       #f4c272;
+  --accent-green:      #72f4a3;
+
+  --text-primary:      #f0eeff;
+  --text-secondary:    #9b96c8;
+  --text-muted:        #5a5480;
+
+  --font-display:      'Orbitron', monospace;
+  --font-mono:         'Share Tech Mono', monospace;
+  --font-serif:        'Cinzel', serif;
+
+  --nav-height:        72px;
+  --section-pad:       120px;
+  --container-max:     1280px;
+  --radius:            8px;
+
+  --ease-out:          cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out:       cubic-bezier(0.65, 0, 0.35, 1);
+
+  --grid-color:        rgba(181,123,238,0.35);
+  --grid-color-h:      rgba(126,244,232,0.2);
+  --scan-line:         rgba(0,0,0,0.15);
+
+  --glow-primary:      0 0 40px rgba(181,123,238,0.35), 0 0 80px rgba(181,123,238,0.15);
+  --glow-secondary:    0 0 40px rgba(126,244,232,0.35), 0 0 80px rgba(126,244,232,0.15);
+  --glow-tertiary:     0 0 40px rgba(244,114,182,0.35), 0 0 80px rgba(244,114,182,0.15);
+
+  --hero-filter:       hue-rotate(240deg) saturate(2.5) brightness(0.35) contrast(1.2);
+  --portrait-filter:   hue-rotate(240deg) saturate(2) brightness(0.45) contrast(1.3);
+}
+
+/* ============================================================
+   RESET & BASE
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--canvas);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 16px;
+  line-height: 1.7;
+  overflow-x: hidden;
+  cursor: none;
+}
+
+::selection {
+  background: var(--accent-primary);
+  color: var(--canvas);
+}
+
+img { display: block; max-width: 100%; }
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* ============================================================
+   CUSTOM CURSOR
+   ============================================================ */
+#cursor-dot {
+  position: fixed;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-secondary);
+  pointer-events: none;
+  z-index: 10000;
+  transform: translate(-50%, -50%);
+  transition: background 0.2s ease;
+  mix-blend-mode: screen;
+}
+
+#cursor-ring {
+  position: fixed;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1.5px solid var(--accent-primary);
+  pointer-events: none;
+  z-index: 9999;
+  transform: translate(-50%, -50%);
+  opacity: 0.7;
+  transition: width 0.3s var(--ease-out),
+              height 0.3s var(--ease-out),
+              border-color 0.3s ease,
+              opacity 0.3s ease;
+}
+
+body:has(a:hover) #cursor-ring,
+body:has(button:hover) #cursor-ring {
+  width: 44px;
+  height: 44px;
+  border-color: var(--accent-secondary);
+  opacity: 1;
+}
+
+/* ============================================================
+   NOISE OVERLAY
+   ============================================================ */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.4;
+}
+
+/* ============================================================
+   CONTAINER
+   ============================================================ */
+.container {
+  max-width: var(--container-max);
+  margin: 0 auto;
+  padding: 0 48px;
+}
+
+/* ============================================================
+   NAVIGATION
+   ============================================================ */
+#nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--nav-height);
+  z-index: 1000;
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  background: rgba(4,3,10,0.75);
+  border-bottom: 1px solid var(--border);
+  opacity: 0;
+  transform: translateY(-8px);
+  animation: navFadeIn 0.8s var(--ease-out) 0.3s forwards;
+}
+
+@keyframes navFadeIn {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.nav-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 100%;
+}
+
+.nav-logo {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  position: relative;
+}
+
+.nav-logo::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 36px;
+  list-style: none;
+}
+
+.nav-links a {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-secondary);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  position: relative;
+  padding: 4px 0;
+  transition: color 0.2s ease;
+}
+
+.nav-links a::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  height: 1px;
+  background: var(--accent-secondary);
+  transition: width 0.3s var(--ease-out);
+}
+
+.nav-links a:hover {
+  color: var(--text-primary);
+}
+
+.nav-links a:hover::after { width: 100%; }
+
+/* ============================================================
+   SCROLL REVEAL
+   ============================================================ */
+.reveal {
+  opacity: 0;
+  transform: translateY(48px);
+  transition: opacity 0.8s var(--ease-out), transform 0.8s var(--ease-out);
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.reveal-delay-1 { transition-delay: 0.1s; }
+.reveal-delay-2 { transition-delay: 0.2s; }
+.reveal-delay-3 { transition-delay: 0.3s; }
+.reveal-delay-4 { transition-delay: 0.4s; }
+.reveal-delay-5 { transition-delay: 0.5s; }
+
+/* ============================================================
+   SECTION LABEL
+   ============================================================ */
+.section-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--accent-secondary);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.section-label::before {
+  content: '';
+  display: inline-block;
+  width: 24px;
+  height: 1px;
+  background: var(--accent-secondary);
+}
+
+/* ============================================================
+   HERO SECTION
+   ============================================================ */
+#hero {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  min-height: 700px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.hero-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.hero-bg img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 20%;
+  filter: var(--hero-filter);
+}
+
+/* Vaporwave perspective grid */
+.perspective-grid {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.grid-plane {
+  position: absolute;
+  bottom: 0;
+  left: -50%;
+  width: 200%;
+  height: 70%;
+  transform: perspective(600px) rotateX(70deg);
+  transform-origin: bottom center;
+  background-image:
+    linear-gradient(var(--grid-color) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+  background-size: 80px 80px;
+  animation: gridScroll 2s linear infinite;
+}
+
+@keyframes gridScroll {
+  from { background-position: 0 0; }
+  to   { background-position: 0 80px; }
+}
+
+.grid-horizon {
+  position: absolute;
+  top: 30%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    var(--accent-primary) 30%,
+    var(--accent-secondary) 50%,
+    var(--accent-primary) 70%,
+    transparent 100%
+  );
+  opacity: 0.6;
+  box-shadow: 0 0 20px var(--accent-primary), 0 0 40px rgba(181,123,238,0.4);
+}
+
+/* CRT scanlines */
+.scanlines {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    var(--scan-line) 2px,
+    var(--scan-line) 4px
+  );
+}
+
+/* Vignette */
+.vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 80% 80% at 50% 50%,
+    transparent 40%,
+    rgba(4,3,10,0.6) 80%,
+    rgba(4,3,10,0.95) 100%
+  );
+}
+
+.hero-content {
+  position: relative;
+  z-index: 4;
+  text-align: center;
+  padding: 0 32px;
+}
+
+.hero-title {
+  font-family: var(--font-display);
+  font-size: clamp(72px, 12vw, 140px);
+  font-weight: 900;
+  letter-spacing: 0.25em;
+  line-height: 0.9;
+  text-transform: uppercase;
+  color: var(--text-primary);
+  margin-bottom: 32px;
+
+  /* Chromatic aberration */
+  text-shadow:
+    3px 0 0 rgba(126,244,232,0.75),
+    -3px 0 0 rgba(244,114,182,0.75),
+    0 0 60px rgba(181,123,238,0.5),
+    0 0 120px rgba(181,123,238,0.2);
+
+  animation: chromaticGlitch 6s ease-in-out infinite;
+}
+
+@keyframes chromaticGlitch {
+  0%, 85%, 100% {
+    text-shadow:
+      3px 0 0 rgba(126,244,232,0.75),
+      -3px 0 0 rgba(244,114,182,0.75),
+      0 0 60px rgba(181,123,238,0.5),
+      0 0 120px rgba(181,123,238,0.2);
+    transform: none;
+    clip-path: none;
+  }
+  87% {
+    text-shadow:
+      8px 0 0 rgba(126,244,232,0.9),
+      -8px 0 0 rgba(244,114,182,0.9),
+      0 0 80px rgba(181,123,238,0.7);
+    transform: skewX(-2deg) translateX(3px);
+  }
+  88% {
+    text-shadow:
+      -5px 0 0 rgba(126,244,232,0.9),
+      5px 0 0 rgba(244,114,182,0.9),
+      0 0 40px rgba(181,123,238,0.4);
+    transform: skewX(1.5deg) translateX(-2px);
+  }
+  89% {
+    text-shadow:
+      10px 2px 0 rgba(126,244,232,0.7),
+      -10px -2px 0 rgba(244,114,182,0.7),
+      0 0 100px rgba(181,123,238,0.8);
+    transform: skewX(-0.5deg);
+  }
+  90% {
+    text-shadow:
+      3px 0 0 rgba(126,244,232,0.75),
+      -3px 0 0 rgba(244,114,182,0.75),
+      0 0 60px rgba(181,123,238,0.5);
+    transform: none;
+  }
+}
+
+.hero-subtitle {
+  font-family: var(--font-serif);
+  font-size: clamp(18px, 2.5vw, 28px);
+  font-weight: 400;
+  color: var(--text-secondary);
+  letter-spacing: 0.12em;
+  margin-bottom: 20px;
+}
+
+.hero-quote {
+  font-family: var(--font-serif);
+  font-size: clamp(13px, 1.5vw, 16px);
+  font-style: italic;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+  margin-bottom: 52px;
+}
+
+.hero-quote cite {
+  display: block;
+  margin-top: 8px;
+  font-style: normal;
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent-primary);
+  opacity: 0.8;
+}
+
+.hero-ctas {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.btn {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  padding: 14px 36px;
+  border-radius: var(--radius);
+  cursor: none;
+  transition: all 0.25s var(--ease-out);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.btn-primary {
+  background: var(--accent-primary);
+  color: var(--canvas);
+  border: 1px solid var(--accent-primary);
+  font-weight: 700;
+}
+
+.btn-primary::before {
+  background: linear-gradient(135deg, var(--accent-secondary), var(--accent-primary));
+}
+
+.btn-primary:hover::before { opacity: 1; }
+
+.btn-primary:hover {
+  box-shadow: var(--glow-primary);
+  transform: translateY(-2px);
+}
+
+.btn-outline {
+  background: transparent;
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+
+.btn-outline:hover {
+  border-color: var(--accent-secondary);
+  color: var(--accent-secondary);
+  box-shadow: var(--glow-secondary);
+  transform: translateY(-2px);
+}
+
+.scroll-indicator {
+  position: absolute;
+  bottom: 36px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  animation: scrollBob 2s ease-in-out infinite;
+}
+
+.scroll-indicator .scroll-line {
+  width: 1px;
+  height: 40px;
+  background: linear-gradient(to bottom, var(--accent-primary), transparent);
+  animation: scrollLine 2s ease-in-out infinite;
+}
+
+@keyframes scrollBob {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50%       { transform: translateX(-50%) translateY(6px); }
+}
+
+@keyframes scrollLine {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+/* ============================================================
+   PROBLEM SECTION
+   ============================================================ */
+#problem {
+  padding: var(--section-pad) 0;
+  position: relative;
+  z-index: 2;
+}
+
+.problem-inner {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 80px;
+  align-items: center;
+}
+
+.problem-portrait {
+  position: relative;
+}
+
+.problem-portrait img {
+  width: 100%;
+  height: 580px;
+  object-fit: cover;
+  object-position: center top;
+  filter: var(--portrait-filter);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.problem-portrait::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, rgba(181,123,238,0.15), transparent 60%);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.problem-portrait::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(0,0,0,0.08) 3px,
+    rgba(0,0,0,0.08) 4px
+  );
+  border-radius: var(--radius);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.portrait-caption {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  z-index: 3;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.problem-text h2 {
+  font-family: var(--font-display);
+  font-size: clamp(32px, 4vw, 52px);
+  font-weight: 700;
+  line-height: 1.1;
+  margin-bottom: 28px;
+  letter-spacing: -0.01em;
+}
+
+.problem-text h2 .highlight {
+  color: var(--accent-tertiary);
+}
+
+.problem-text p {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  line-height: 1.8;
+  color: var(--text-secondary);
+  margin-bottom: 52px;
+  max-width: 480px;
+}
+
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px 24px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+}
+
+.stat-card:hover {
+  border-color: rgba(181,123,238,0.4);
+  box-shadow: 0 0 30px rgba(181,123,238,0.12);
+}
+
+.stat-number {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--accent-secondary);
+  margin-bottom: 6px;
+  display: block;
+}
+
+.stat-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* ============================================================
+   GRAPH SECTION
+   ============================================================ */
+#graph {
+  padding: var(--section-pad) 0;
+  position: relative;
+  z-index: 2;
+  background: linear-gradient(180deg, transparent, rgba(13,11,26,0.6) 20%, rgba(13,11,26,0.6) 80%, transparent);
+}
+
+.graph-header {
+  text-align: center;
+  margin-bottom: 64px;
+}
+
+.graph-header h2 {
+  font-family: var(--font-display);
+  font-size: clamp(28px, 4vw, 48px);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin-bottom: 16px;
+}
+
+.graph-header p {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  color: var(--text-secondary);
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+.canvas-wrapper {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: inset 0 0 80px rgba(4,3,10,0.8), 0 0 60px rgba(181,123,238,0.08);
+}
+
+.canvas-wrapper::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.08) 2px,
+    rgba(0,0,0,0.08) 3px
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+#graphCanvas {
+  display: block;
+  width: 100%;
+  height: 520px;
+  position: relative;
+  z-index: 0;
+}
+
+.graph-legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 36px;
+  margin-top: 32px;
+  flex-wrap: wrap;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-secondary);
+  letter-spacing: 0.1em;
+}
+
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.legend-dot.claim      { background: var(--accent-secondary); }
+.legend-dot.assumption { background: var(--accent-primary); }
+.legend-dot.inference  { background: #e8e4ff; }
+.legend-dot.violation  { background: var(--accent-tertiary); box-shadow: 0 0 8px var(--accent-tertiary); }
+
+/* ============================================================
+   VIOLATION CARDS
+   ============================================================ */
+#detection {
+  padding: var(--section-pad) 0;
+  position: relative;
+  z-index: 2;
+}
+
+.detection-header {
+  margin-bottom: 64px;
+}
+
+.detection-header h2 {
+  font-family: var(--font-display);
+  font-size: clamp(28px, 4vw, 48px);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  margin-bottom: 16px;
+}
+
+.detection-header p {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  color: var(--text-secondary);
+  max-width: 600px;
+}
+
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.violation-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 32px 28px;
+  position: relative;
+  overflow: hidden;
+  cursor: none;
+  transition:
+    transform 0.3s var(--ease-out),
+    box-shadow 0.3s ease,
+    border-color 0.3s ease;
+}
+
+.card-accent-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 10px 10px 0 0;
+}
+
+.violation-card:hover {
+  transform: translateY(-6px);
+  border-color: rgba(255,255,255,0.12);
+}
+
+.card-id {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.card-name {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.4;
+  margin-bottom: 14px;
+  letter-spacing: 0.04em;
+}
+
+.card-desc {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+
+/* per-card accent color applied via inline style for the bar + hover glow */
+.violation-card[data-accent="1"]:hover { box-shadow: 0 16px 48px rgba(126,244,232,0.15); }
+.violation-card[data-accent="2"]:hover { box-shadow: 0 16px 48px rgba(181,123,238,0.15); }
+.violation-card[data-accent="3"]:hover { box-shadow: 0 16px 48px rgba(244,114,182,0.15); }
+.violation-card[data-accent="4"]:hover { box-shadow: 0 16px 48px rgba(244,194,114,0.15); }
+.violation-card[data-accent="5"]:hover { box-shadow: 0 16px 48px rgba(114,244,163,0.15); }
+.violation-card[data-accent="6"]:hover { box-shadow: 0 16px 48px rgba(126,244,232,0.15); }
+
+/* ============================================================
+   PHILOSOPHY STRIP
+   ============================================================ */
+#philosophy {
+  position: relative;
+  padding: calc(var(--section-pad) * 1.5) 0;
+  overflow: hidden;
+  z-index: 2;
+}
+
+.philosophy-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.philosophy-bg img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 30%;
+  filter: var(--hero-filter);
+}
+
+.philosophy-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(180deg,
+    rgba(4,3,10,0.7) 0%,
+    rgba(4,3,10,0.3) 40%,
+    rgba(4,3,10,0.3) 60%,
+    rgba(4,3,10,0.7) 100%
+  );
+}
+
+.philosophy-scanlines {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.12) 2px,
+    rgba(0,0,0,0.12) 4px
+  );
+}
+
+.philosophy-content {
+  position: relative;
+  z-index: 3;
+  text-align: center;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 48px;
+}
+
+.philosophy-quote {
+  font-family: var(--font-serif);
+  font-size: clamp(20px, 3vw, 36px);
+  font-style: italic;
+  line-height: 1.6;
+  color: var(--text-primary);
+  margin-bottom: 24px;
+  text-shadow: 0 2px 20px rgba(4,3,10,0.8);
+}
+
+.philosophy-attribution {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--accent-primary);
+}
+
+/* ============================================================
+   HOW IT WORKS — TERMINAL
+   ============================================================ */
+#how {
+  padding: var(--section-pad) 0;
+  position: relative;
+  z-index: 2;
+}
+
+.how-inner {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 80px;
+  align-items: start;
+}
+
+.how-header {
+  position: sticky;
+  top: calc(var(--nav-height) + 40px);
+}
+
+.how-header h2 {
+  font-family: var(--font-display);
+  font-size: clamp(28px, 3.5vw, 44px);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  margin-bottom: 20px;
+  line-height: 1.15;
+}
+
+.how-header p {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  color: var(--text-secondary);
+  line-height: 1.8;
+}
+
+.terminal-window {
+  background: var(--canvas);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 0 60px rgba(4,3,10,0.8), 0 0 0 1px rgba(255,255,255,0.03);
+}
+
+.terminal-bar {
+  background: var(--raised);
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.terminal-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.terminal-dot.red    { background: #ff5f57; }
+.terminal-dot.yellow { background: #febc2e; }
+.terminal-dot.green  { background: #28c840; }
+
+.terminal-title {
+  margin-left: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  letter-spacing: 0.1em;
+}
+
+.terminal-body {
+  padding: 32px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.terminal-step {
+  padding: 16px 0;
+  border-bottom: 1px solid rgba(42,36,80,0.4);
+  opacity: 0;
+  transform: translateX(-16px);
+  transition: opacity 0.5s var(--ease-out), transform 0.5s var(--ease-out);
+}
+
+.terminal-step.visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.terminal-step:last-child { border-bottom: none; }
+
+.step-prompt {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.step-prompt .prompt-char {
+  color: var(--accent-secondary);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.step-prompt .step-num {
+  color: var(--text-muted);
+  flex-shrink: 0;
+  font-size: 11px;
+  margin-top: 2px;
+  letter-spacing: 0.1em;
+}
+
+.step-text {
+  color: var(--text-primary);
+  line-height: 1.6;
+}
+
+.step-text .hl-primary   { color: var(--accent-secondary); }
+.step-text .hl-secondary { color: var(--accent-primary); }
+.step-text .hl-warning   { color: var(--accent-tertiary); }
+.step-text .hl-success   { color: var(--accent-green); }
+
+/* ============================================================
+   BENCHMARK TABLE
+   ============================================================ */
+#benchmark {
+  padding: var(--section-pad) 0;
+  position: relative;
+  z-index: 2;
+}
+
+.benchmark-header {
+  margin-bottom: 52px;
+}
+
+.benchmark-header h2 {
+  font-family: var(--font-display);
+  font-size: clamp(28px, 4vw, 48px);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  margin-bottom: 16px;
+}
+
+.benchmark-header p {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  color: var(--text-secondary);
+  max-width: 600px;
+}
+
+.table-wrapper {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+thead {
+  background: var(--raised);
+  border-bottom: 1px solid var(--border);
+}
+
+thead th {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 18px 24px;
+  text-align: left;
+}
+
+thead th:first-child {
+  width: 80px;
+}
+
+tbody tr {
+  border-bottom: 1px solid rgba(42,36,80,0.4);
+  transition: background 0.2s ease;
+}
+
+tbody tr:last-child { border-bottom: none; }
+
+tbody tr:hover {
+  background: rgba(22,19,42,0.8);
+}
+
+tbody td {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding: 18px 24px;
+  vertical-align: middle;
+}
+
+.td-id {
+  font-weight: 700;
+  color: var(--accent-primary);
+  letter-spacing: 0.08em;
+  font-size: 12px;
+}
+
+.td-type {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.td-metric {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.metric-bar {
+  flex: 1;
+  height: 3px;
+  background: var(--border);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.metric-bar-fill {
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+  transform-origin: left;
+  transform: scaleX(0);
+  transition: transform 1s var(--ease-out);
+}
+
+.metric-bar-fill.animated { transform: scaleX(1); }
+
+.metric-val {
+  font-size: 13px;
+  color: var(--text-primary);
+  min-width: 40px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+td.td-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  max-width: 280px;
+}
+
+/* ============================================================
+   FOOTER
+   ============================================================ */
+#footer {
+  position: relative;
+  z-index: 2;
+  padding: 80px 0 48px;
+  border-top: 1px solid var(--border);
+}
+
+.footer-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 28px;
+}
+
+.footer-logo {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 900;
+  letter-spacing: 0.35em;
+  color: var(--text-primary);
+  text-shadow:
+    2px 0 0 rgba(126,244,232,0.4),
+    -2px 0 0 rgba(244,114,182,0.4);
+}
+
+.footer-tagline {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  font-style: italic;
+  color: var(--text-muted);
+  letter-spacing: 0.1em;
+}
+
+.footer-links {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  list-style: none;
+}
+
+.footer-links a {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  transition: color 0.2s ease;
+}
+
+.footer-links a:hover { color: var(--accent-secondary); }
+
+.footer-divider {
+  width: 1px;
+  height: 16px;
+  background: var(--border);
+}
+
+.footer-credit {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  letter-spacing: 0.12em;
+}
+
+.footer-credit strong {
+  color: var(--text-secondary);
+}
+
+/* ============================================================
+   DIVIDER LINE
+   ============================================================ */
+.section-divider {
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border) 30%, var(--border) 70%, transparent);
+  position: relative;
+  z-index: 2;
+}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 1024px) {
+  .container { padding: 0 32px; }
+  .cards-grid { grid-template-columns: repeat(2, 1fr); }
+  .how-inner { grid-template-columns: 1fr; gap: 48px; }
+  .how-header { position: static; }
+}
+
+@media (max-width: 768px) {
+  :root { --section-pad: 80px; }
+  .container { padding: 0 20px; }
+  .problem-inner { grid-template-columns: 1fr; gap: 48px; }
+  .cards-grid { grid-template-columns: 1fr; }
+  .stats-row { grid-template-columns: 1fr; }
+  .nav-links { display: none; }
+  .hero-title { font-size: clamp(56px, 18vw, 100px); }
+  thead th:nth-child(5) { display: none; }
+  tbody td:nth-child(5) { display: none; }
+}
+</style>
+</head>
+
+<body>
+
+<!-- ============================================================
+     CUSTOM CURSOR
+     ============================================================ -->
+<div id="cursor-dot"></div>
+<div id="cursor-ring"></div>
+
+<!-- ============================================================
+     NAVIGATION
+     ============================================================ -->
+<nav id="nav">
+  <div class="container">
+    <div class="nav-inner">
+      <a href="#hero" class="nav-logo">NOUS</a>
+      <ul class="nav-links">
+        <li><a href="#problem">Problem</a></li>
+        <li><a href="#graph">Graph</a></li>
+        <li><a href="#detection">Detection</a></li>
+        <li><a href="#benchmark">Paper</a></li>
+        <li><a href="https://github.com" target="_blank">GitHub</a></li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<!-- ============================================================
+     HERO
+     ============================================================ -->
+<section id="hero">
+  <div class="hero-bg">
+    <img
+      src="https://upload.wikimedia.org/wikipedia/commons/4/49/Raphael_School_of_Athens.jpg"
+      alt="The School of Athens by Raphael"
+      onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/4/49/Raphael_School_of_Athens.jpg/1920px-Raphael_School_of_Athens.jpg'; this.onerror=null;"
+    >
+  </div>
+
+  <div class="perspective-grid">
+    <div class="grid-plane"></div>
+    <div class="grid-horizon"></div>
+  </div>
+
+  <div class="scanlines"></div>
+  <div class="vignette"></div>
+
+  <div class="hero-content">
+    <h1 class="hero-title">NOUS</h1>
+    <p class="hero-subtitle">The mind that watches the mind</p>
+    <blockquote class="hero-quote">
+      "The unexamined life is not worth living."
+      <cite>— Aristotle</cite>
+    </blockquote>
+    <div class="hero-ctas">
+      <a href="https://github.com" target="_blank" class="btn btn-primary">→ GitHub</a>
+      <a href="#graph" class="btn btn-outline">See the Graph →</a>
+    </div>
+  </div>
+
+  <div class="scroll-indicator">
+    <span>Scroll</span>
+    <div class="scroll-line"></div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ============================================================
+     PROBLEM SECTION
+     ============================================================ -->
+<section id="problem">
+  <div class="container">
+    <div class="problem-inner">
+
+      <div class="problem-portrait reveal">
+        <img
+          src="https://upload.wikimedia.org/wikipedia/commons/a/ae/Aristotle_Altemps_Inv8575.jpg"
+          alt="Aristotle bust, Palazzo Altemps"
+          onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/a/ae/Aristotle_Altemps_Inv8575.jpg/440px-Aristotle_Altemps_Inv8575.jpg'; this.onerror=null;"
+        >
+        <div class="portrait-caption">Aristotle — Ludovisi Collection, Rome</div>
+      </div>
+
+      <div class="problem-text">
+        <div class="section-label reveal reveal-delay-1">The Problem</div>
+        <h2 class="reveal reveal-delay-2">
+          AI reasoning<br>breaks <span class="highlight">silently.</span>
+        </h2>
+        <p class="reveal reveal-delay-3">
+          Every session, every tool call, every chain of thought — commitments are made and forgotten.
+          Premises are asserted, then contradicted. Modal claims are scope-shifted without notice.
+          Temporal anchors drift. Nous watches the graph of beliefs and catches the exact moment
+          inference goes dark.
+        </p>
+
+        <div class="stats-row">
+          <div class="stat-card reveal reveal-delay-3">
+            <span class="stat-number">847</span>
+            <span class="stat-label">Violations Detected</span>
+          </div>
+          <div class="stat-card reveal reveal-delay-4">
+            <span class="stat-number">7</span>
+            <span class="stat-label">Violation Types</span>
+          </div>
+          <div class="stat-card reveal reveal-delay-5">
+            <span class="stat-number">O(V+E)</span>
+            <span class="stat-label">Graph Traversal</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ============================================================
+     GRAPH SECTION
+     ============================================================ -->
+<section id="graph">
+  <div class="container">
+    <div class="graph-header reveal">
+      <div class="section-label" style="justify-content:center;">Live Simulation</div>
+      <h2>The Commitment Graph</h2>
+      <p>Every belief is a node. Every inference is an edge. Every violation is a rupture in the fabric of coherent thought.</p>
+    </div>
+    <div class="canvas-wrapper reveal reveal-delay-1">
+      <canvas id="graphCanvas"></canvas>
+    </div>
+    <div class="graph-legend reveal reveal-delay-2">
+      <div class="legend-item">
+        <div class="legend-dot claim"></div>
+        <span>Claim</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot assumption"></div>
+        <span>Assumption</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot inference"></div>
+        <span>Inference</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot violation"></div>
+        <span>Violation</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ============================================================
+     DETECTION CARDS
+     ============================================================ -->
+<section id="detection">
+  <div class="container">
+    <div class="detection-header">
+      <div class="section-label reveal">Violation Taxonomy</div>
+      <h2 class="reveal reveal-delay-1">Six Ways Reasoning Fails</h2>
+      <p class="reveal reveal-delay-2">
+        Nous formalizes every failure mode in the epistemic logic of agent cognition.
+        Each type is independently detectable, independently scorable.
+      </p>
+    </div>
+
+    <div class="cards-grid">
+
+      <div class="violation-card reveal reveal-delay-1" data-accent="1">
+        <div class="card-accent-bar" style="background: linear-gradient(90deg, var(--accent-secondary), #4af0e0);"></div>
+        <div class="card-id">GT-01</div>
+        <div class="card-name">ModusPonensViolation</div>
+        <div class="card-desc">Agent asserts P and P→Q but fails to derive Q, or derives ¬Q. The bedrock inference rule broken at the operational level.</div>
+      </div>
+
+      <div class="violation-card reveal reveal-delay-2" data-accent="2">
+        <div class="card-accent-bar" style="background: linear-gradient(90deg, var(--accent-primary), #d4a0ff);"></div>
+        <div class="card-id">GT-02</div>
+        <div class="card-name">BeliefRevisionFailure</div>
+        <div class="card-desc">New evidence is received but prior contradictory belief persists without retraction. AGM postulate violation at runtime.</div>
+      </div>
+
+      <div class="violation-card reveal reveal-delay-3" data-accent="3">
+        <div class="card-accent-bar" style="background: linear-gradient(90deg, var(--accent-tertiary), #ff8fd4);"></div>
+        <div class="card-id">GT-03</div>
+        <div class="card-name">ModalScopeError</div>
+        <div class="card-desc">Necessary and possible operators conflated. □P treated as ◇P or vice versa, corrupting downstream modal reasoning chains.</div>
+      </div>
+
+      <div class="violation-card reveal reveal-delay-1" data-accent="4">
+        <div class="card-accent-bar" style="background: linear-gradient(90deg, var(--accent-gold), #ffe0a0);"></div>
+        <div class="card-id">GT-04</div>
+        <div class="card-name">TemporalCoherenceViolation</div>
+        <div class="card-desc">Claims indexed to time T₁ are applied at T₂ without justification. The session timeline becomes internally inconsistent.</div>
+      </div>
+
+      <div class="violation-card reveal reveal-delay-2" data-accent="5">
+        <div class="card-accent-bar" style="background: linear-gradient(90deg, var(--accent-green), #a0ffe0);"></div>
+        <div class="card-id">GT-05</div>
+        <div class="card-name">ReferentialOpacityFailure</div>
+        <div class="card-desc">Substitution of co-referential terms inside belief contexts — violating Frege's principle within the agent's propositional attitudes.</div>
+      </div>
+
+      <div class="violation-card reveal reveal-delay-3" data-accent="6">
+        <div class="card-accent-bar" style="background: linear-gradient(90deg, var(--accent-secondary), var(--accent-primary));"></div>
+        <div class="card-id">GT-06</div>
+        <div class="card-name">EpistemicClosureViolation</div>
+        <div class="card-desc">Agent knows P and knows P→Q but fails to register knowledge of Q. The closure principle of epistemic logic is breached.</div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ============================================================
+     PHILOSOPHY STRIP
+     ============================================================ -->
+<section id="philosophy">
+  <div class="philosophy-bg">
+    <img
+      src="https://upload.wikimedia.org/wikipedia/commons/4/49/Raphael_School_of_Athens.jpg"
+      alt="The School of Athens"
+      onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/4/49/Raphael_School_of_Athens.jpg/1920px-Raphael_School_of_Athens.jpg'; this.onerror=null;"
+    >
+  </div>
+  <div class="philosophy-overlay"></div>
+  <div class="philosophy-scanlines"></div>
+
+  <div class="philosophy-content reveal">
+    <blockquote class="philosophy-quote">
+      "It is the mark of an educated mind to be able to entertain a thought without accepting it."
+    </blockquote>
+    <div class="philosophy-attribution">— Aristotle, Nicomachean Ethics</div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ============================================================
+     HOW IT WORKS
+     ============================================================ -->
+<section id="how">
+  <div class="container">
+    <div class="how-inner">
+
+      <div class="how-header">
+        <div class="section-label reveal">Process</div>
+        <h2 class="reveal reveal-delay-1">How Nous<br>Watches</h2>
+        <p class="reveal reveal-delay-2">
+          Five steps from raw reasoning trace to formal coherence score.
+          Every step is deterministic. Every violation is logged. No thought escapes the graph.
+        </p>
+      </div>
+
+      <div class="terminal-window reveal reveal-delay-2">
+        <div class="terminal-bar">
+          <div class="terminal-dot red"></div>
+          <div class="terminal-dot yellow"></div>
+          <div class="terminal-dot green"></div>
+          <span class="terminal-title">nous — reasoning-monitor v1.0.0</span>
+        </div>
+        <div class="terminal-body" id="terminalSteps">
+          <div class="terminal-step" data-step="0">
+            <div class="step-prompt">
+              <span class="prompt-char">›</span>
+              <span class="step-num">[01]</span>
+              <span class="step-text">Session begins. Beliefs extracted from reasoning trace. <span class="hl-primary">CommitmentExtractor</span> parses 143 propositions.</span>
+            </div>
+          </div>
+          <div class="terminal-step" data-step="1">
+            <div class="step-prompt">
+              <span class="prompt-char">›</span>
+              <span class="step-num">[02]</span>
+              <span class="step-text">Each claim enters the commitment graph as a <span class="hl-secondary">typed node</span>. Edges inferred from logical dependency.</span>
+            </div>
+          </div>
+          <div class="terminal-step" data-step="2">
+            <div class="step-prompt">
+              <span class="prompt-char">›</span>
+              <span class="step-num">[03]</span>
+              <span class="step-text">Entailment engine checks every new action against prior commitments. <span class="hl-primary">O(V+E)</span> traversal per step.</span>
+            </div>
+          </div>
+          <div class="terminal-step" data-step="3">
+            <div class="step-prompt">
+              <span class="prompt-char">›</span>
+              <span class="step-num">[04]</span>
+              <span class="step-text">Violation detected — <span class="hl-warning">TemporalCoherenceViolation</span> at step 7. Belief from T₁ applied without anchoring at T₄.</span>
+            </div>
+          </div>
+          <div class="terminal-step" data-step="4">
+            <div class="step-prompt">
+              <span class="prompt-char">›</span>
+              <span class="step-num">[05]</span>
+              <span class="step-text">Full graph exported. Session coherence score: <span class="hl-success">0.842</span>. Report: 3 violations, 7 types checked, 0 false positives.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ============================================================
+     BENCHMARK TABLE
+     ============================================================ -->
+<section id="benchmark">
+  <div class="container">
+    <div class="benchmark-header">
+      <div class="section-label reveal">Evaluation</div>
+      <h2 class="reveal reveal-delay-1">Benchmark Results</h2>
+      <p class="reveal reveal-delay-2">
+        Evaluated across 40 annotated sessions, 847 total violations. F1 = 0.842 overall.
+        All seven violation types independently validated.
+      </p>
+    </div>
+
+    <div class="table-wrapper reveal reveal-delay-2">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Type</th>
+            <th>F1</th>
+            <th>Precision</th>
+            <th>Recall</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="td-id">GT-01</td>
+            <td class="td-type">ModusPonensViolation</td>
+            <td class="td-metric">
+              <div class="metric-bar-wrap">
+                <div class="metric-bar"><div class="metric-bar-fill" data-val="0.91"></div></div>
+                <span class="metric-val">0.91</span>
+              </div>
+            </td>
+            <td class="td-metric">
+              <div class="metric-bar-wrap">
+                <div class="metric-bar"><div class="metric-bar-fill" data-val="0.93"></div></div>
+                <span class="metric-val">0.93</span>
+              </div>
+            </td>
+            <td class="td-metric">
+              <div class="metric-bar-wrap">
+                <div class="metric-bar"><div class="metric-bar-fill" data-val="0.89"></div></div>
+                <span class="metric-val">0.89</span>
+              </div>
+            </td>
+            <td class="td-desc">Core deductive inference failure</td>
+          </tr>
+          <tr>
+            <td class="td-id">GT-02</td>
+            <td class="td-type">BeliefRevisionFailure</td>
+            <td class="td-metric">
+              <div class="metric-bar-wrap">
+                <div class="metric-bar"><div class="metric-bar-fill" data-val="0.87"></div></div>
+                <span class="metric-val">0.87</span>
+              </div>
+            </td>
+            <td class="td-metric">
+              <div class="metric-bar-wrap">
+                <div class="metric-bar"><div class="metric-bar-fill" data-val="0.89"></div></div>
+                <span class="metric-val">0.89</span>
+              </div>
+            </td>
+            <td class="td-metric">
+              <div class="metric-bar-wrap">
+                <div class="metric-bar"><div class="metric-bar-fill" data-val="0.85"></div></div>
+                <span class="metric-val">0.85</span>
+              </div>
+            </td>
+            <td class="td-desc">AGM retraction failure under new evidence</td>
+          </tr>
+          <tr>
+            <td class="td-id">GT-03</td>
+            <td class="td-type">ModalScopeError</td>
+            <td class="td-metric">
+              <div class="metric-bar-wrap">
+                <div class="metric-bar"><div class="metric-bar-fill" data-val="0.79"></div></div>
+                <span class="metric-val">0.79</span>
+              </div>
+            </td>
+            <td class="td-metric">
+              <div class="metric-bar-wrap">
+                <div class="metric-bar"><div class="metric-bar-fill" data-val="0.84"></div></div>
+                <span class="metric-val">0.84</span>
+              </div>
+            </td>
+            <td class="td-metric">
+              <div class="metric-bar-wrap">
+                <div class="metric-bar"><div class="metric-bar-fill" data-val="0.75"></div></div>
+                <span class="metric-val">0.75</span>
+              </div>
+            </td>
+            <td class="td-desc">Necessity / possibility operator conflation</td>
+          </tr>
+          <tr>
+            <td class="td-id">GT-04</td>
+            <td class="td-type">TemporalCoherenceViolation</td>
+            <td class="td-metric">
+              <div class="metric-bar-wrap">
+                <div class="metric-bar"><div class="metric-bar-fill" data-val="0.85"></div></div>
+                <span class="metric-val">0.85</span>
+              </div>
+            </td>
+            <td class="td-metric">
+              <div class="metric-bar-wrap">
+                <div class="metric-bar"><div class="metric-bar-fill" data-val="0.91"></div></div>
+                <span class="metric-val">0.91</span>
+              </div>
+            </td>
+            <td class="td-metric">
+              <div class="metric-bar-wrap">
+                <div class="metric-bar"><div class="metric-bar-fill" data-val="0.80"></div></div>
+                <span class="metric-val">0.80</span>
+              </div>
+            </td>
+            <td class="td-desc">Cross-temporal belief anchor drift</td>
+          </tr>
+          <tr>
+            <td class="td-id">GT-05</td>
+            <td class="td-type">ReferentialOpacityFailure</td>
+            <td class="td-metric">
+              <div class="metric-bar-wrap">
+                <div class="metric-bar"><div class="metric-bar-fill" data-val="0.82"></div></div>
+                <span class="metric-val">0.82</span>
+              </div>
+            </td>
+            <td class="td-metric">
+              <div class="metric-bar-wrap">
+                <div class="metric-bar"><div class="metric-bar-fill" data-val="0.88"></div></div>
+                <span class="metric-val">0.88</span>
+              </div>
+            </td>
+            <td class="td-metric">
+              <div class="metric-bar-wrap">
+                <div class="metric-bar"><div class="metric-bar-fill" data-val="0.77"></div></div>
+                <span class="metric-val">0.77</span>
+              </div>
+            </td>
+            <td class="td-desc">Substitution failure in opaque belief contexts</td>
+          </tr>
+          <tr>
+            <td class="td-id">GT-06</td>
+            <td class="td-type">EpistemicClosureViolation</td>
+            <td class="td-metric">
+              <div class="metric-bar-wrap">
+                <div class="metric-bar"><div class="metric-bar-fill" data-val="0.88"></div></div>
+                <span class="metric-val">0.88</span>
+              </div>
+            </td>
+            <td class="td-metric">
+              <div class="metric-bar-wrap">
+                <div class="metric-bar"><div class="metric-bar-fill" data-val="0.90"></div></div>
+                <span class="metric-val">0.90</span>
+              </div>
+            </td>
+            <td class="td-metric">
+              <div class="metric-bar-wrap">
+                <div class="metric-bar"><div class="metric-bar-fill" data-val="0.86"></div></div>
+                <span class="metric-val">0.86</span>
+              </div>
+            </td>
+            <td class="td-desc">Known entailment not registered as known</td>
+          </tr>
+          <tr>
+            <td class="td-id">GT-07</td>
+            <td class="td-type">QuantifierScopeViolation</td>
+            <td class="td-metric">
+              <div class="metric-bar-wrap">
+                <div class="metric-bar"><div class="metric-bar-fill" data-val="0.76"></div></div>
+                <span class="metric-val">0.76</span>
+              </div>
+            </td>
+            <td class="td-metric">
+              <div class="metric-bar-wrap">
+                <div class="metric-bar"><div class="metric-bar-fill" data-val="0.81"></div></div>
+                <span class="metric-val">0.81</span>
+              </div>
+            </td>
+            <td class="td-metric">
+              <div class="metric-bar-wrap">
+                <div class="metric-bar"><div class="metric-bar-fill" data-val="0.72"></div></div>
+                <span class="metric-val">0.72</span>
+              </div>
+            </td>
+            <td class="td-desc">∀/∃ scope ambiguity causing invalid generalizations</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ============================================================
+     FOOTER
+     ============================================================ -->
+<footer id="footer">
+  <div class="container">
+    <div class="footer-inner">
+      <div class="footer-logo">NOUS</div>
+      <div class="footer-tagline">Reasoning integrity for the age of AI</div>
+      <ul class="footer-links">
+        <li><a href="https://github.com" target="_blank">GitHub</a></li>
+        <div class="footer-divider"></div>
+        <li><a href="#">Paper</a></li>
+        <div class="footer-divider"></div>
+        <li><a href="mailto:sayan@example.com">Contact</a></li>
+      </ul>
+      <div class="footer-credit">Built by <strong>Sayan Gupta</strong></div>
+    </div>
+  </div>
+</footer>
+
+<!-- ============================================================
+     JAVASCRIPT
+     ============================================================ -->
+<script>
+'use strict';
+
+/* ============================================================
+   CURSOR
+   ============================================================ */
+(function() {
+  const dot  = document.getElementById('cursor-dot');
+  const ring = document.getElementById('cursor-ring');
+
+  let mx = 0, my = 0;
+  let rx = 0, ry = 0;
+  const FRAMES = 8;
+
+  document.addEventListener('mousemove', e => {
+    mx = e.clientX;
+    my = e.clientY;
+  });
+
+  let frame = 0;
+  function updateRing() {
+    frame++;
+    // ring lags 8 frames: update every 8th frame effectively via lerp
+    rx += (mx - rx) * 0.12;
+    ry += (my - ry) * 0.12;
+
+    dot.style.left  = mx + 'px';
+    dot.style.top   = my + 'px';
+    ring.style.left = rx + 'px';
+    ring.style.top  = ry + 'px';
+    requestAnimationFrame(updateRing);
+  }
+  updateRing();
+})();
+
+
+/* ============================================================
+   SCROLL REVEAL
+   ============================================================ */
+(function() {
+  const observer = new IntersectionObserver(
+    entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.classList.add('visible');
+          // Don't unobserve so repeated scrolling works for terminal steps
+          if (!e.target.classList.contains('terminal-step')) {
+            observer.unobserve(e.target);
+          }
+        }
+      });
+    },
+    { threshold: 0.12, rootMargin: '0px 0px -40px 0px' }
+  );
+
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+  // Terminal steps special observer — cascade with delay
+  const termObs = new IntersectionObserver(
+    entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          const steps = document.querySelectorAll('.terminal-step');
+          steps.forEach((step, i) => {
+            setTimeout(() => step.classList.add('visible'), i * 280);
+          });
+          termObs.unobserve(e.target);
+        }
+      });
+    },
+    { threshold: 0.3 }
+  );
+  const terminalBody = document.getElementById('terminalSteps');
+  if (terminalBody) termObs.observe(terminalBody);
+})();
+
+
+/* ============================================================
+   METRIC BAR ANIMATION
+   ============================================================ */
+(function() {
+  const barObs = new IntersectionObserver(
+    entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.querySelectorAll('.metric-bar-fill').forEach(fill => {
+            const val = parseFloat(fill.dataset.val);
+            fill.style.width = (val * 100) + '%';
+            fill.classList.add('animated');
+          });
+          barObs.unobserve(e.target);
+        }
+      });
+    },
+    { threshold: 0.2 }
+  );
+  const table = document.querySelector('.table-wrapper');
+  if (table) barObs.observe(table);
+})();
+
+
+/* ============================================================
+   CANVAS GRAPH SIMULATION
+   ============================================================ */
+(function() {
+  const canvas = document.getElementById('graphCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  // CSS variable reader
+  const style = getComputedStyle(document.documentElement);
+  const C = {
+    canvas:     style.getPropertyValue('--canvas').trim(),
+    surface:    style.getPropertyValue('--surface').trim(),
+    border:     style.getPropertyValue('--border').trim(),
+    primary:    style.getPropertyValue('--accent-primary').trim(),
+    secondary:  style.getPropertyValue('--accent-secondary').trim(),
+    tertiary:   style.getPropertyValue('--accent-tertiary').trim(),
+    textMuted:  style.getPropertyValue('--text-muted').trim(),
+    textSec:    style.getPropertyValue('--text-secondary').trim(),
+    textPri:    style.getPropertyValue('--text-primary').trim(),
+    green:      style.getPropertyValue('--accent-green').trim(),
+  };
+
+  // Node types
+  const TYPE_CLAIM     = 'claim';
+  const TYPE_ASSUMP    = 'assumption';
+  const TYPE_INFER     = 'inference';
+  const TYPE_VIOLATE   = 'violation';
+
+  let W, H;
+  function resize() {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    W = canvas.width  = rect.width;
+    H = canvas.height = 520;
+    canvas.style.height = '520px';
+  }
+  resize();
+  window.addEventListener('resize', () => { resize(); });
+
+  // Nodes
+  const nodes = [
+    { id:0,  type: TYPE_CLAIM,   label: 'P: "Tool call valid"',   x:0, y:0, vx:0, vy:0, r:22 },
+    { id:1,  type: TYPE_ASSUMP,  label: 'A: "State preserved"',   x:0, y:0, vx:0, vy:0, r:20 },
+    { id:2,  type: TYPE_INFER,   label: 'I: "Output stable"',     x:0, y:0, vx:0, vy:0, r:20 },
+    { id:3,  type: TYPE_CLAIM,   label: 'P: "Modal □safe"',       x:0, y:0, vx:0, vy:0, r:22 },
+    { id:4,  type: TYPE_ASSUMP,  label: 'A: "T₁ context"',        x:0, y:0, vx:0, vy:0, r:20 },
+    { id:5,  type: TYPE_INFER,   label: 'I: "Entails Q"',         x:0, y:0, vx:0, vy:0, r:20 },
+    { id:6,  type: TYPE_VIOLATE, label: '⚡ TemporalViolation',   x:0, y:0, vx:0, vy:0, r:24 },
+    { id:7,  type: TYPE_CLAIM,   label: 'P: "Ref = A"',           x:0, y:0, vx:0, vy:0, r:22 },
+    { id:8,  type: TYPE_VIOLATE, label: '⚡ EpistemicClosure',    x:0, y:0, vx:0, vy:0, r:24 },
+    { id:9,  type: TYPE_INFER,   label: 'I: "K(P→Q)"',            x:0, y:0, vx:0, vy:0, r:20 },
+  ];
+
+  // Scatter initial positions
+  function scatter() {
+    const pad = 80;
+    nodes.forEach(n => {
+      n.x = pad + Math.random() * (W - 2*pad);
+      n.y = pad + Math.random() * (H - 2*pad);
+      n.vx = (Math.random() - 0.5) * 0.5;
+      n.vy = (Math.random() - 0.5) * 0.5;
+    });
+  }
+  scatter();
+
+  // Edges: [from, to, dashed]
+  const edges = [
+    [0, 2, false],
+    [1, 2, false],
+    [2, 5, false],
+    [3, 5, false],
+    [4, 6, true ],  // temporal gap
+    [5, 6, true ],  // violation edge
+    [7, 8, true ],  // referential → violation
+    [9, 8, true ],  // epistemic → violation
+    [0, 3, false],
+    [1, 4, false],
+    [3, 9, false],
+    [7, 9, false],
+    [2, 7, false],
+    [5, 9, false],
+  ];
+
+  // Spring physics
+  const SPRING_K     = 0.0025;
+  const SPRING_REST  = 160;
+  const REPEL_FORCE  = 6000;
+  const DAMPING      = 0.88;
+  const EDGE_SPRING  = 0.003;
+
+  let pulseT = 0;
+
+  function color(n) {
+    switch(n.type) {
+      case TYPE_CLAIM:   return C.secondary;  // cyan
+      case TYPE_ASSUMP:  return C.primary;    // purple
+      case TYPE_INFER:   return '#e0deff';    // near-white
+      case TYPE_VIOLATE: return C.tertiary;   // pink
+    }
+  }
+
+  function updatePhysics() {
+    const N = nodes.length;
+    // Repulsion between all pairs
+    for (let i = 0; i < N; i++) {
+      for (let j = i+1; j < N; j++) {
+        const dx = nodes[j].x - nodes[i].x;
+        const dy = nodes[j].y - nodes[i].y;
+        const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+        const force = REPEL_FORCE / (dist * dist);
+        const fx = (dx / dist) * force;
+        const fy = (dy / dist) * force;
+        nodes[i].vx -= fx;
+        nodes[i].vy -= fy;
+        nodes[j].vx += fx;
+        nodes[j].vy += fy;
+      }
+    }
+
+    // Spring attraction along edges
+    edges.forEach(([a, b]) => {
+      const na = nodes[a], nb = nodes[b];
+      const dx = nb.x - na.x;
+      const dy = nb.y - na.y;
+      const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+      const stretch = dist - SPRING_REST;
+      const force = EDGE_SPRING * stretch;
+      const fx = (dx / dist) * force;
+      const fy = (dy / dist) * force;
+      na.vx += fx; na.vy += fy;
+      nb.vx -= fx; nb.vy -= fy;
+    });
+
+    // Gentle center pull
+    const cx = W / 2, cy = H / 2;
+    nodes.forEach(n => {
+      n.vx += (cx - n.x) * 0.0004;
+      n.vy += (cy - n.y) * 0.0004;
+      n.vx *= DAMPING;
+      n.vy *= DAMPING;
+      n.x  += n.vx;
+      n.y  += n.vy;
+      // Boundary
+      const pad = n.r + 20;
+      if (n.x < pad)   { n.x = pad;   n.vx *= -0.5; }
+      if (n.x > W-pad) { n.x = W-pad; n.vx *= -0.5; }
+      if (n.y < pad)   { n.y = pad;   n.vy *= -0.5; }
+      if (n.y > H-pad) { n.y = H-pad; n.vy *= -0.5; }
+    });
+  }
+
+  function drawEdge(na, nb, dashed, t) {
+    ctx.save();
+    const mx = (na.x + nb.x) / 2 + Math.sin(t * 0.3 + na.id) * 20;
+    const my = (na.y + nb.y) / 2 + Math.cos(t * 0.2 + nb.id) * 20;
+
+    ctx.beginPath();
+    ctx.moveTo(na.x, na.y);
+    ctx.quadraticCurveTo(mx, my, nb.x, nb.y);
+
+    if (dashed) {
+      ctx.setLineDash([6, 6]);
+      ctx.strokeStyle = 'rgba(244,114,182,0.35)';
+      ctx.lineWidth = 1.5;
+    } else {
+      ctx.setLineDash([]);
+      ctx.strokeStyle = 'rgba(126,244,232,0.18)';
+      ctx.lineWidth = 1.2;
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawNode(n, t) {
+    ctx.save();
+    const isViolation = n.type === TYPE_VIOLATE;
+    const pulse = isViolation ? (0.5 + 0.5 * Math.sin(t * 3 + n.id)) : 0;
+
+    // Glow for violation nodes
+    if (isViolation) {
+      const glowR = n.r + 8 + pulse * 16;
+      const grad = ctx.createRadialGradient(n.x, n.y, n.r * 0.5, n.x, n.y, glowR);
+      grad.addColorStop(0, `rgba(244,114,182,${0.4 + pulse * 0.3})`);
+      grad.addColorStop(1, 'rgba(244,114,182,0)');
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, glowR, 0, Math.PI * 2);
+      ctx.fillStyle = grad;
+      ctx.fill();
+    } else {
+      // Subtle glow for all nodes
+      const glowR = n.r + 12;
+      const g2 = ctx.createRadialGradient(n.x, n.y, n.r * 0.5, n.x, n.y, glowR);
+      const c = color(n);
+      g2.addColorStop(0, c + '44');
+      g2.addColorStop(1, c + '00');
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, glowR, 0, Math.PI * 2);
+      ctx.fillStyle = g2;
+      ctx.fill();
+    }
+
+    // Node circle
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
+
+    if (isViolation) {
+      const innerGrad = ctx.createRadialGradient(n.x - n.r*0.3, n.y - n.r*0.3, 2, n.x, n.y, n.r);
+      innerGrad.addColorStop(0, '#ff8fcc');
+      innerGrad.addColorStop(1, C.tertiary);
+      ctx.fillStyle = innerGrad;
+    } else {
+      const innerGrad = ctx.createRadialGradient(n.x - n.r*0.3, n.y - n.r*0.3, 1, n.x, n.y, n.r);
+      const c = color(n);
+      innerGrad.addColorStop(0, c + 'ee');
+      innerGrad.addColorStop(1, c + '99');
+      ctx.fillStyle = innerGrad;
+    }
+    ctx.fill();
+
+    // Node border
+    ctx.strokeStyle = isViolation
+      ? `rgba(244,114,182,${0.7 + pulse * 0.3})`
+      : color(n) + 'aa';
+    ctx.lineWidth = isViolation ? 2 : 1.5;
+    ctx.stroke();
+
+    // Label
+    const lines = n.label.split('\n');
+    ctx.font = `11px 'Share Tech Mono', monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // Label background
+    const labelY = n.y + n.r + 16;
+    const maxW = ctx.measureText(n.label).width + 16;
+    ctx.fillStyle = 'rgba(4,3,10,0.8)';
+    ctx.beginPath();
+    ctx.roundRect(n.x - maxW/2, labelY - 9, maxW, 18, 3);
+    ctx.fill();
+
+    ctx.fillStyle = isViolation ? C.tertiary : C.textSec;
+    ctx.fillText(n.label, n.x, labelY);
+
+    ctx.restore();
+  }
+
+  let animRunning = false;
+  let frameT = 0;
+
+  function draw() {
+    frameT += 0.016;
+    pulseT += 0.016;
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Background grid dots
+    ctx.save();
+    ctx.fillStyle = 'rgba(42,36,80,0.3)';
+    const gSpacing = 40;
+    for (let gx = gSpacing; gx < W; gx += gSpacing) {
+      for (let gy = gSpacing; gy < H; gy += gSpacing) {
+        ctx.beginPath();
+        ctx.arc(gx, gy, 1, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+
+    updatePhysics();
+
+    // Draw edges
+    edges.forEach(([a, b, dashed]) => {
+      drawEdge(nodes[a], nodes[b], dashed, frameT);
+    });
+
+    // Draw nodes
+    nodes.forEach(n => drawNode(n, pulseT));
+
+    requestAnimationFrame(draw);
+  }
+
+  // Start when canvas enters viewport
+  const canvasObs = new IntersectionObserver(
+    entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting && !animRunning) {
+          animRunning = true;
+          draw();
+          canvasObs.unobserve(e.target);
+        }
+      });
+    },
+    { threshold: 0.1 }
+  );
+  canvasObs.observe(canvas);
+
+})();
+
+
+/* ============================================================
+   ACTIVE NAV LINK ON SCROLL
+   ============================================================ */
+(function() {
+  const sections = document.querySelectorAll('section[id]');
+  const navLinks = document.querySelectorAll('.nav-links a[href^="#"]');
+
+  const obs = new IntersectionObserver(
+    entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          const id = e.target.id;
+          navLinks.forEach(a => {
+            a.style.color = a.getAttribute('href') === '#' + id
+              ? 'var(--accent-secondary)'
+              : '';
+          });
+        }
+      });
+    },
+    { threshold: 0.4 }
+  );
+  sections.forEach(s => obs.observe(s));
+})();
+
+
+/* ============================================================
+   STAT COUNTER ANIMATION
+   ============================================================ */
+(function() {
+  function animateCount(el, end, isDecimal) {
+    let start = 0;
+    const duration = 1800;
+    const startTime = performance.now();
+
+    function step(now) {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const val = start + (end - start) * eased;
+
+      if (isDecimal) {
+        el.textContent = val.toFixed(3);
+      } else {
+        el.textContent = Math.round(val).toLocaleString();
+      }
+      if (progress < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  const statObs = new IntersectionObserver(
+    entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.querySelectorAll('.stat-number').forEach(el => {
+            const raw = el.textContent.trim();
+            if (raw === '847') animateCount(el, 847, false);
+            else if (raw === '7') animateCount(el, 7, false);
+            // O(V+E) stays as text
+          });
+          statObs.unobserve(e.target);
+        }
+      });
+    },
+    { threshold: 0.5 }
+  );
+  const problemSection = document.getElementById('problem');
+  if (problemSection) statObs.observe(problemSection);
+})();
+
+</script>
+
+</body>
+</html>
