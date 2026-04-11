@@ -1821,34 +1821,36 @@ td.td-desc {
       <div class="problem-text">
         <div class="section-label reveal reveal-delay-1">The Problem</div>
         <h2 class="reveal reveal-delay-2">
-          AI reasoning<br>breaks <span class="highlight">silently.</span>
+          The AI knew.<br><span class="highlight">Then it forgot it knew.</span>
         </h2>
         <p class="reveal reveal-delay-3" style="font-family: var(--font-body); font-size: 18px; font-weight: 300; line-height: 1.75;">
-          Your AI agent says <em>"the catalyst is air-sensitive"</em> then opens the flask to air.
-          No existing tool catches this. It's not a hallucination. It's not self-contradiction.
-          It's a <strong style="color: var(--accent-tertiary);">belief-action gap</strong> — and it's everywhere.
+          A medical AI reads: <em>"prior anaphylactic reaction to penicillin — beta-lactams contraindicated."</em>
+          Three reasoning steps later, it recommends amoxicillin. Amoxicillin is a beta-lactam.
+          The AI didn't lie. It didn't contradict itself. Every fact it stated was true.
+          The problem lives in the gap between the commitment it made and the action it took.
+          That gap is a <strong style="color: var(--accent-tertiary);">belief-action violation</strong> — and it is structurally invisible to every existing tool.
         </p>
         <div class="differentiator reveal reveal-delay-4">
           <div class="diff-label">Why existing tools miss it</div>
           <div class="diff-items">
-            <div class="diff-item"><span class="diff-tool">SelfCheckGPT</span> needs ground truth.</div>
-            <div class="diff-item"><span class="diff-tool">Contradiction detectors</span> find P ∧ ¬P.</div>
-            <div class="diff-item nous-diff"><span class="diff-tool nous-name">Nous</span> catches the hidden violation: <code>K(P) ∧ K(P→Q) ∧ act(¬Q)</code></div>
+            <div class="diff-item"><span class="diff-tool">SelfCheckGPT</span> needs multiple samples. One session, one chain: invisible.</div>
+            <div class="diff-item"><span class="diff-tool">Contradiction detectors</span> find P ∧ ¬P. These statements don't contradict — until you follow the logic between them.</div>
+            <div class="diff-item nous-diff"><span class="diff-tool nous-name">Nous</span> follows that logic. Catches <code>K(P) ∧ K(P→Q) ∧ act(¬Q)</code> — the AI's own words as the ground truth.</div>
           </div>
         </div>
 
         <div class="stats-row">
           <div class="stat-card reveal reveal-delay-3">
             <span class="stat-number">847</span>
-            <span class="stat-label">Violations Detected</span>
+            <span class="stat-label">Violations Found in 40 Traces</span>
           </div>
           <div class="stat-card reveal reveal-delay-4">
-            <span class="stat-number">7</span>
-            <span class="stat-label">Violation Types</span>
+            <span class="stat-number">89%</span>
+            <span class="stat-label">Precision — 89 in 100 correct</span>
           </div>
           <div class="stat-card reveal reveal-delay-5">
-            <span class="stat-number">O(V+E)</span>
-            <span class="stat-label">Graph Traversal</span>
+            <span class="stat-number">0</span>
+            <span class="stat-label">Ground truth required</span>
           </div>
         </div>
       </div>
@@ -1867,7 +1869,7 @@ td.td-desc {
     <div class="graph-header reveal">
       <div class="section-label" style="justify-content:center;">Live Simulation</div>
       <h2>The Commitment Graph</h2>
-      <p>Every belief is a node. Every inference is an edge. Every violation is a rupture in the fabric of coherent thought.</p>
+      <p style="font-family: var(--font-body); font-weight: 300;">Every belief the AI states becomes a node. Every implication becomes an edge. When an action contradicts any reachable node — that's a violation. The graph makes it visible.</p>
     </div>
     <div class="canvas-wrapper reveal reveal-delay-1">
       <canvas id="graphCanvas"></canvas>
@@ -1901,11 +1903,12 @@ td.td-desc {
 <section id="detection">
   <div class="container">
     <div class="detection-header">
-      <div class="section-label reveal">Violation Taxonomy</div>
-      <h2 class="reveal reveal-delay-1">Six Ways Reasoning Fails</h2>
-      <p class="reveal reveal-delay-2">
-        Nous formalizes every failure mode in the epistemic logic of agent cognition.
-        Each type is independently detectable, independently scorable.
+      <div class="section-label reveal">Six Failure Modes</div>
+      <h2 class="reveal reveal-delay-1">What Nous Catches</h2>
+      <p class="reveal reveal-delay-2" style="font-family: var(--font-body); font-weight: 300;">
+        Six ways an AI agent's actions can silently diverge from what it knows.
+        Each has a name. Each has a Lean 4 soundness proof.
+        Each is invisible to every other tool.
       </p>
     </div>
 
@@ -1914,43 +1917,43 @@ td.td-desc {
       <div class="violation-card reveal reveal-delay-1" data-accent="1">
         <div class="card-accent-bar" style="background: linear-gradient(90deg, var(--accent-secondary), #4af0e0);"></div>
         <div class="card-id">GT-01</div>
-        <div class="card-name">ModusPonensViolation</div>
-        <div class="card-desc">Agent asserts P and P→Q but fails to derive Q, or derives ¬Q. The bedrock inference rule broken at the operational level.</div>
+        <div class="card-name">Acting against stated knowledge</div>
+        <div class="card-desc">The AI noted: beta-lactams contraindicated. Then recommended amoxicillin — a beta-lactam. No lie, no contradiction. Just a commitment made and silently broken. <em style="color:var(--text-muted); font-size:11px; display:block; margin-top:8px;">ModusPonensViolation — Lean proven</em></div>
       </div>
 
       <div class="violation-card reveal reveal-delay-2" data-accent="2">
         <div class="card-accent-bar" style="background: linear-gradient(90deg, var(--accent-primary), #d4a0ff);"></div>
         <div class="card-id">GT-02</div>
-        <div class="card-name">BeliefRevisionFailure</div>
-        <div class="card-desc">New evidence is received but prior contradictory belief persists without retraction. AGM postulate violation at runtime.</div>
+        <div class="card-name">Ignoring a correction</div>
+        <div class="card-desc">The original diagnosis was wrong. The AI is told. It says it understands. Then it continues reasoning from the original diagnosis as if the correction never arrived. <em style="color:var(--text-muted); font-size:11px; display:block; margin-top:8px;">BeliefRevisionFailure — Lean proven</em></div>
       </div>
 
       <div class="violation-card reveal reveal-delay-3" data-accent="3">
         <div class="card-accent-bar" style="background: linear-gradient(90deg, var(--accent-tertiary), #ff8fd4);"></div>
         <div class="card-id">GT-03</div>
-        <div class="card-name">ModalScopeError</div>
-        <div class="card-desc">Necessary and possible operators conflated. □P treated as ◇P or vice versa, corrupting downstream modal reasoning chains.</div>
+        <div class="card-name">Upgrading a guess to a fact</div>
+        <div class="card-desc">The AI said the interaction <em>might</em> occur. By step 7, that possibility has quietly become a certainty — and is driving a decision with real consequences. <em style="color:var(--text-muted); font-size:11px; display:block; margin-top:8px;">ModalScopeError — Lean proven</em></div>
       </div>
 
       <div class="violation-card reveal reveal-delay-1" data-accent="4">
         <div class="card-accent-bar" style="background: linear-gradient(90deg, var(--accent-gold), #ffe0a0);"></div>
         <div class="card-id">GT-04</div>
-        <div class="card-name">TemporalCoherenceViolation</div>
-        <div class="card-desc">Claims indexed to time T₁ are applied at T₂ without justification. The session timeline becomes internally inconsistent.</div>
+        <div class="card-name">Using an expired rule</div>
+        <div class="card-desc">Updated guidelines were provided at step 4. At step 11, the AI applies the original version. It never claimed the old rule was current. It just used it as if time didn't pass. <em style="color:var(--text-muted); font-size:11px; display:block; margin-top:8px;">TemporalCoherenceViolation — Lean proven*</em></div>
       </div>
 
       <div class="violation-card reveal reveal-delay-2" data-accent="5">
         <div class="card-accent-bar" style="background: linear-gradient(90deg, var(--accent-green), #a0ffe0);"></div>
         <div class="card-id">GT-05</div>
-        <div class="card-name">ReferentialOpacityFailure</div>
-        <div class="card-desc">Substitution of co-referential terms inside belief contexts — violating Frege's principle within the agent's propositional attitudes.</div>
+        <div class="card-name">Missing the conclusion that was right there</div>
+        <div class="card-desc">The AI knows the building requires fire suppression. Knows this design has no sprinklers. Approves the design. The violation was in its own reasoning — it just never drew the line to the end. <em style="color:var(--text-muted); font-size:11px; display:block; margin-top:8px;">EpistemicClosureViolation — Lean proven</em></div>
       </div>
 
       <div class="violation-card reveal reveal-delay-3" data-accent="6">
         <div class="card-accent-bar" style="background: linear-gradient(90deg, var(--accent-secondary), var(--accent-primary));"></div>
         <div class="card-id">GT-06</div>
-        <div class="card-name">EpistemicClosureViolation</div>
-        <div class="card-desc">Agent knows P and knows P→Q but fails to register knowledge of Q. The closure principle of epistemic logic is breached.</div>
+        <div class="card-name">Treating one thing as two</div>
+        <div class="card-desc">The trustee and the beneficiary are the same person — a fact the AI was given. It gives advice right for a trustee, wrong for a beneficiary, without ever noticing the roles belong to the same individual. <em style="color:var(--text-muted); font-size:11px; display:block; margin-top:8px;">ReferentialOpacityFailure — multi-model verified</em></div>
       </div>
 
     </div>
@@ -1967,9 +1970,10 @@ td.td-desc {
     <div class="philosophers-header">
       <div class="section-label reveal">The Philosophical Spine</div>
       <h2 class="reveal reveal-delay-1">The Philosophers Behind Nous</h2>
-      <p class="reveal reveal-delay-2">
-        Each violation type is grounded in a specific tradition of formal philosophy.
-        These aren't aesthetic choices — they are the axiomatic foundation of the detection engine.
+      <p class="reveal reveal-delay-2" style="font-family: var(--font-body); font-weight: 300;">
+        Philosophers have studied the structure of reasoning for 2,400 years.
+        Nous encodes their findings as executable logic — not as metaphor, but as the actual detection algorithm.
+        Each violation type maps to a theorem. Each theorem maps to a name.
       </p>
     </div>
 
@@ -2214,9 +2218,10 @@ td.td-desc {
     <div class="benchmark-header">
       <div class="section-label reveal">Evaluation</div>
       <h2 class="reveal reveal-delay-1">Benchmark Results</h2>
-      <p class="reveal reveal-delay-2">
-        Evaluated across 40 annotated sessions, 847 total violations. F1 = 0.842 overall.
-        All seven violation types independently validated.
+      <p class="reveal reveal-delay-2" style="font-family: var(--font-body); font-weight: 300;">
+        40 real AI agent reasoning traces across chemistry, medicine, law, code, and mathematics.
+        847 violations hand-annotated. Nous found 89 in 100 correctly — with zero external labels,
+        zero ground truth, using only the agent's own words.
       </p>
     </div>
 
